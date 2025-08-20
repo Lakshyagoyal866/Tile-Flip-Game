@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matching Tiles Game</title>
+    <!-- Use Font Awesome for icons like hearts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Tailwind CSS for a modern, clean look -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* AESTHETICS & RESPONSIVENESS */
+        :root {
+            --dark-blue: #0A1128;
+            --light-blue: #00B4D8;
+            --red: #D90429;
+            --white: #F1F1F1;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-blue);
+            transition: background-color 0.5s ease;
+        }
+
+        /* New emergency border class */
+        .emergency-border {
+            border-color: var(--red);
+            transition: border-color 0.5s ease;
+        }
+
+        /* Animations for success and failure */
+        @keyframes match-animation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes wrong-animation {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .tile-card.match .tile-card-inner {
+            animation: match-animation 0.5s ease-in-out;
+        }
+
+        .tile-card.wrong .tile-card-inner {
+            animation: wrong-animation 0.5s ease-in-out;
+        }
+
+        .tile-card-inner {
+            transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .tile-card.is-flipped .tile-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+
+        .card-front {
+            transform: rotateY(180deg);
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .heart-lost {
+            animation: pulse 0.5s ease-in-out forwards;
+        }
+
+        /* Analog Timer Styles */
+        .analog-timer {
+            transform: rotate(-90deg); /* Start from the top */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex justify-center items-center min-h-screen text-white text-center transition-colors">
+
+    <div class="container relative w-[95%] max-w-[600px] p-5 rounded-2xl shadow-xl bg-gray-800 bg-opacity-30 flex flex-col gap-5 border-2 border-blue-400">
+        <!-- Start Screen -->
+        <div id="game-start-screen" class="absolute inset-0 bg-gray-900 bg-opacity-95 z-20 flex flex-col justify-center items-center rounded-2xl transition-opacity duration-500">
+            <h2 class="text-3xl sm:text-4xl font-bold mb-4">Memory Match</h2>
+            <p class="text-lg sm:text-xl text-gray-300 mb-6">Can you find all the matching pairs?</p>
+            <button id="start-btn" class="btn px-6 py-3 text-lg font-semibold rounded-lg shadow-md bg-blue-500 text-white hover:bg-blue-600 transition-colors transform hover:scale-105 active:scale-95">Play Game</button>
+        </div>
+        
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="absolute inset-0 bg-gray-900 bg-opacity-95 z-20 flex flex-col justify-center items-center rounded-2xl transition-opacity duration-500 opacity-0 pointer-events-none">
+            <h2 id="game-over-title" class="text-3xl sm:text-4xl font-bold mb-4">Game Over!</h2>
+            <p id="game-over-message" class="text-lg sm:text-xl text-gray-300 mb-6"></p>
+            <button id="restart-btn" class="btn px-6 py-3 text-lg font-semibold rounded-lg shadow-md bg-blue-500 text-white hover:bg-blue-600 transition-colors transform hover:scale-105 active:scale-95">Play Again</button>
+        </div>
+
+        <!-- Lives & Timer UI -->
+        <div id="game-info" class="flex justify-between items-center h-16 p-3 rounded-lg bg-gray-700 bg-opacity-30 border border-blue-400">
+            <div id="lives-container" class="flex gap-2 text-2xl text-red-500">
+                <i class="fas fa-heart heart"></i>
+                <i class="fas fa-heart heart"></i>
+                <i class="fas fa-heart heart"></i>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="analog-timer" class="w-10 h-10 rounded-full border-2 border-blue-400 relative"></div>
+                <div id="timer-text" class="text-xl font-mono min-w-[50px] text-right">01:00</div>
+            </div>
+        </div>
+        
+        <!-- Game Board UI -->
+        <div id="game-board" class="grid grid-cols-4 gap-3 p-3 rounded-lg min-h-[400px] border border-blue-400 bg-gray-700 bg-opacity-30"></div>
+
+        <!-- Message Box -->
+        <div id="message-box" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-900 text-white py-2 px-4 rounded-md z-30 opacity-0 transition-opacity duration-500"></div>
+
+    </div>
+
+    <script>
+        // Use window.onload to ensure the entire DOM is loaded before running the script
+        window.onload = function() {
+            const gameBoard = document.getElementById('game-board');
+            const startScreen = document.getElementById('game-start-screen');
+            const gameOverScreen = document.getElementById('game-over-screen');
+            const startBtn = document.getElementById('start-btn');
+            const restartBtn = document.getElementById('restart-btn');
+            const livesContainer = document.getElementById('lives-container');
+            const timerText = document.getElementById('timer-text');
+            const analogTimer = document.getElementById('analog-timer');
+            const messageBox = document.getElementById('message-box');
+            const container = document.querySelector('.container');
+            const gameInfo = document.getElementById('game-info');
+
+            // Game state variables
+            let lives = 3;
+            let time = 60;
+            let timerInterval;
+            let isFlipping = false;
+            let matchedPairs = 0;
+            let firstCard = null;
+            let secondCard = null;
+            
+            // Emojis for the tiles (8 for a 4x4 grid)
+            const emojis = [
+                '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑'
+            ];
+            
+            // Function to create and shuffle the tiles
+            function createTiles() {
+                // Duplicate the emojis to create pairs
+                const tileEmojis = [...emojis, ...emojis];
+                
+                // Shuffle the array using Fisher-Yates shuffle algorithm
+                for (let i = tileEmojis.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [tileEmojis[i], tileEmojis[j]] = [tileEmojis[j], tileEmojis[i]];
+                }
+
+                // Generate HTML for each tile
+                tileEmojis.forEach(emoji => {
+                    const card = document.createElement('div');
+                    card.classList.add('tile-card', 'h-24', 'w-full', 'bg-transparent', 'relative', 'perspective-1000', 'cursor-pointer', 'rounded-lg');
+                    card.dataset.emoji = emoji;
+
+                    // Create the inner card with front and back faces
+                    card.innerHTML = `
+                        <div class="tile-card-inner relative w-full h-full text-center transition-transform duration-500 preserve-3d rounded-lg">
+                            <div class="card-face card-back absolute inset-0 bg-blue-400 rounded-lg flex justify-center items-center text-3xl shadow-md cursor-pointer"></div>
+                            <div class="card-face card-front absolute inset-0 bg-blue-600 rounded-lg flex justify-center items-center text-3xl shadow-md text-white backface-hidden">
+                                ${emoji}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add click event listener to each card
+                    card.addEventListener('click', handleTileClick);
+                    if (gameBoard) {
+                        gameBoard.appendChild(card);
+                    }
+                });
+            }
+            
+            // Show a temporary message
+            function showMessage(msg) {
+                if (messageBox) {
+                    messageBox.textContent = msg;
+                    messageBox.classList.add('opacity-100');
+                    setTimeout(() => {
+                        messageBox.classList.remove('opacity-100');
+                    }, 1500);
+                }
+            }
+
+            // Handle a tile click event
+            function handleTileClick(event) {
+                const clickedCard = event.currentTarget;
+
+                // Prevent flipping if two cards are already being checked or if the card is already flipped
+                if (isFlipping || clickedCard.classList.contains('is-flipped')) {
+                    return;
+                }
+
+                // Flip the card and set it as the first or second card
+                clickedCard.classList.add('is-flipped');
+                if (!firstCard) {
+                    firstCard = clickedCard;
+                } else {
+                    secondCard = clickedCard;
+                    isFlipping = true;
+                    setTimeout(checkForMatch, 800); // Delay to let the user see the second card
+                }
+            }
+
+            // Check if the two flipped cards match
+            function checkForMatch() {
+                if (!firstCard || !secondCard) return; // Add a safety check here too
+
+                const isMatch = firstCard.dataset.emoji === secondCard.dataset.emoji;
+
+                if (isMatch) {
+                    // If cards match, apply match animation and disable clicks
+                    firstCard.classList.add('match');
+                    secondCard.classList.add('match');
+                    firstCard.removeEventListener('click', handleTileClick);
+                    secondCard.removeEventListener('click', handleTileClick);
+                    matchedPairs++;
+                    showMessage('Match found!');
+                    
+                    // Check for win condition
+                    if (matchedPairs === emojis.length) {
+                        clearInterval(timerInterval);
+                        showGameOver('You win!');
+                    }
+                } else {
+                    // If cards don't match, apply wrong animation and lose a life
+                    firstCard.classList.add('wrong');
+                    secondCard.classList.add('wrong');
+                    
+                    // Remove wrong animation after it plays
+                    setTimeout(() => {
+                        firstCard.classList.remove('wrong');
+                        secondCard.classList.remove('wrong');
+                    }, 500);
+
+                    lives--;
+                    updateLivesDisplay();
+                    showMessage('Wrong!');
+                    
+                    // Flip the cards back over
+                    setTimeout(() => {
+                        firstCard.classList.remove('is-flipped');
+                        secondCard.classList.remove('is-flipped');
+                    }, 800);
+                }
+
+                // Reset card variables for the next turn
+                firstCard = null;
+                secondCard = null;
+                isFlipping = false;
+
+                // Check for lose condition
+                if (lives <= 0) {
+                    clearInterval(timerInterval);
+                    showGameOver('You lose!');
+                }
+            }
+            
+            // Update the lives display (heart icons)
+            function updateLivesDisplay() {
+                if (livesContainer) {
+                    const hearts = livesContainer.querySelectorAll('.heart');
+                    hearts.forEach((heart, index) => {
+                        if (heart) {
+                             if (index >= lives) {
+                                heart.classList.add('heart-lost', 'text-gray-500');
+                            } else {
+                                heart.classList.remove('heart-lost', 'text-gray-500');
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // Update the timer display
+            function updateTimerDisplay() {
+                const seconds = time % 60;
+                const minutes = Math.floor(time / 60);
+                if (timerText) {
+                    timerText.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+
+                // Update the analog timer visual
+                const percentage = (time / 60) * 100;
+                // Use different color for the timer filling when in emergency mode
+                const timerColor = container && container.classList.contains('emergency-border') ? 'var(--red)' : 'var(--light-blue)';
+                if (analogTimer) {
+                     analogTimer.style.background = `conic-gradient(${timerColor} ${percentage}%, transparent ${percentage}%)`;
+                }
+            }
+
+            // Countdown function
+            function countdown() {
+                time--;
+                updateTimerDisplay();
+
+                // Check for red border trigger
+                if (time <= 15) {
+                    if (container) container.classList.add('emergency-border');
+                    if (gameInfo) gameInfo.classList.add('emergency-border');
+                    if (gameBoard) gameBoard.classList.add('emergency-border');
+                    if (analogTimer) analogTimer.classList.add('emergency-border');
+                    if (timerText) timerText.classList.add('text-red-500');
+                } else {
+                    if (container) container.classList.remove('emergency-border');
+                    if (gameInfo) gameInfo.classList.remove('emergency-border');
+                    if (gameBoard) gameBoard.classList.remove('emergency-border');
+                    if (analogTimer) analogTimer.classList.remove('emergency-border');
+                    if (timerText) timerText.classList.remove('text-red-500');
+                }
+
+                // Check for game over
+                if (time <= 0) {
+                    clearInterval(timerInterval);
+                    showGameOver('Time\'s up!');
+                }
+            }
+
+            // Function to start the timer
+            function startTimer() {
+                clearInterval(timerInterval);
+                timerInterval = setInterval(countdown, 1000);
+            }
+            
+            // Display the game over screen
+            function showGameOver(message) {
+                if (gameOverScreen) {
+                    gameOverScreen.classList.remove('opacity-0', 'pointer-events-none');
+                }
+                const gameOverMessage = document.getElementById('game-over-message');
+                if (gameOverMessage) {
+                    gameOverMessage.textContent = message;
+                }
+            }
+
+            // Function to show all tiles for 3 seconds and then hide them
+            function showAndHideTiles() {
+                const tiles = document.querySelectorAll('.tile-card');
+                tiles.forEach(tile => tile.classList.add('is-flipped'));
+                
+                // Set a timeout to flip them back after 3 seconds
+                setTimeout(() => {
+                    tiles.forEach(tile => tile.classList.remove('is-flipped'));
+                    // Start the timer after the tiles are hidden
+                    startTimer();
+                }, 3000); // 3 seconds
+            }
+
+            // Function to initialize the game state and start the game
+            function startGame() {
+                // Reset game state
+                lives = 3;
+                time = 60;
+                isFlipping = false;
+                matchedPairs = 0;
+                firstCard = null;
+                secondCard = null;
+                
+                // Clear the game board and re-create tiles
+                if (gameBoard) {
+                    gameBoard.innerHTML = '';
+                }
+                createTiles();
+                
+                // Update UI elements
+                if (startScreen) startScreen.classList.add('opacity-0', 'pointer-events-none');
+                if (gameOverScreen) gameOverScreen.classList.add('opacity-0', 'pointer-events-none');
+                
+                // Ensure no emergency borders are visible at the start
+                if (container) container.classList.remove('emergency-border');
+                if (gameInfo) gameInfo.classList.remove('emergency-border');
+                if (gameBoard) gameBoard.classList.remove('emergency-border');
+                if (analogTimer) analogTimer.classList.remove('emergency-border');
+                if (timerText) timerText.classList.remove('text-red-500');
+
+                updateLivesDisplay();
+                updateTimerDisplay();
+                
+                // Start the new sequence: show tiles, then hide them, then start the timer
+                showAndHideTiles();
+            }
+
+            // Event listeners for the buttons
+            if (startBtn) startBtn.addEventListener('click', startGame);
+            if (restartBtn) restartBtn.addEventListener('click', startGame);
+
+            // Initial setup
+            updateLivesDisplay();
+            updateTimerDisplay();
+        }
+    </script>
+</body>
+</html>
