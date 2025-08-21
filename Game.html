@@ -311,9 +311,9 @@
                 '<i class="fa-brands fa-node-js"></i>', '<i class="fa-brands fa-square-github"></i>', '<i class="fa-brands fa-square-facebook"></i>', '<i class="fa-brands fa-square-instagram"></i>', '<i class="fa-brands fa-square-x-twitter"></i>', '<i class="fa-brands fa-java"></i>', '<i class="fa-brands fa-python"></i>', '<i class="fa-brands fa-react"></i>'
             ];
 
-            // Function to create and shuffle the tiles
+       
             function createTiles() {
-                // Duplicate the emojis to create pairs
+               
                 const tileEmojis = [...emojis, ...emojis];
 
 
@@ -336,7 +336,7 @@
   </div>
 `;
 
-                    // Add click event listener to each card
+                  
                     card.addEventListener('click', handleTileClick);
                     if (gameBoard) {
                         gameBoard.appendChild(card);
@@ -347,7 +347,6 @@
                 });
             }
 
-            // Show a temporary message
             function showMessage(msg) {
                 if (messageBox) {
                     messageBox.textContent = msg;
@@ -358,17 +357,15 @@
                 }
             }
 
-            // Handle a tile click event
+    
             function handleTileClick(event) {
                 const clickedCard = event.currentTarget;
 
-                // Prevent flipping if two cards are already being checked or if the card is already flipped
                 if (isFlipping || clickedCard.classList.contains('is-flipped')) {
                     return;
                 }
                 if (clickedCard === firstCard) return;
 
-                // Flip the card and set it as the first or second card
                 clickedCard.classList.add('is-flipped');
                 flipSound.currentTime = 0;
                 flipSound.play();
@@ -454,7 +451,6 @@
                 }
             }
 
-            // Update the timer display
             function updateTimerDisplay() {
                 const seconds = time % 60;
                 const minutes = Math.floor(time / 60);
@@ -462,7 +458,6 @@
                     timerText.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 }
 
-                // Update the analog timer visual
                 const percentage = (time / 60) * 100;
                 const timerColor = container && container.classList.contains('emergency-border') ? 'var(--red)' : 'var(--light-blue)';
                 if (analogTimer) {
@@ -470,12 +465,10 @@
                 }
             }
 
-            // Countdown function
             function countdown() {
                 time--;
                 updateTimerDisplay();
 
-                // Check for red border trigger
                 if (time <= 15) {
                     if (container) container.classList.add('emergency-border');
                     if (gameInfo) gameInfo.classList.add('emergency-border');
@@ -521,18 +514,16 @@
                 }
             }
 
-            // Function to show all tiles for 3 seconds and then hide them
             function showAndHideTiles() {
                 const tiles = document.querySelectorAll('.tile-card');
 
-                // Flip all tiles open
                 tiles.forEach(tile => tile.classList.add('is-flipped'));
 
 
                 setTimeout(() => {
                     tiles.forEach(tile => tile.classList.remove('is-flipped'));
                     startTimer(); //
-                }, 3000); // show for 3s
+                }, 3000); 
             }
 
 
